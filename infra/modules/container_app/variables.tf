@@ -18,6 +18,12 @@ variable "location" {
   type        = string
 }
 
+variable "environment_id" {
+  description = "Ambiente de Container Apps existente. Con null el modulo crea uno; Azure for Students admite uno solo por suscripcion."
+  type        = string
+  default     = null
+}
+
 variable "environment_location" {
   description = "Region del ambiente y de la app. Con null usa location; la identidad y los logs se quedan en location."
   type        = string

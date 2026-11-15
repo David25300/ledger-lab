@@ -25,6 +25,12 @@ variable "app_location" {
   default     = null
 }
 
+variable "shared_environment_id" {
+  description = "Ambiente de Container Apps de otro stack. Con null el stack crea el suyo."
+  type        = string
+  default     = null
+}
+
 variable "image" {
   description = "Imagen fijada por digest, para que prod ejecute exactamente lo probado en dev."
   type        = string

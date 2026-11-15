@@ -17,7 +17,8 @@ terraform {
 }
 
 resource "azurerm_log_analytics_workspace" "this" {
-  count = var.logs_enabled ? 1 : 0
+  # Los logs son una propiedad del ambiente: solo tienen sentido si este modulo lo crea.
+  count = var.logs_enabled && var.environment_id == null ? 1 : 0
 
   name                = "log-${var.name}"
   resource_group_name = var.resource_group_name
@@ -34,6 +35,8 @@ resource "azurerm_log_analytics_workspace" "this" {
 # crea con azapi y fija el modo de perfiles de carga de trabajo. El perfil Consumption no tiene
 # cargo fijo. El sufijo -wp evita chocar con el nombre del ambiente express que reemplaza.
 resource "azapi_resource" "environment" {
+  count = var.environment_id == null ? 1 : 0
+
   type      = "Microsoft.App/managedEnvironments@2026-07-01"
   name      = "cae-${var.name}-wp"
   parent_id = var.resource_group_id
@@ -54,7 +57,7 @@ resource "azapi_resource" "environment" {
         }
       ]
       # Solo prod envia logs a Log Analytics; en dev el ambiente queda sin destino de logs.
-      appLogsConfiguration = var.logs_enabled ? {
+      appLogsConfiguration = length(azurerm_log_analytics_workspace.this) > 0 ? {
         destination = "log-analytics"
         logAnalyticsConfiguration = {
           customerId = azurerm_log_analytics_workspace.this[0].workspace_id
@@ -64,7 +67,7 @@ resource "azapi_resource" "environment" {
   }
 
   # La clave del workspace no se guarda en el cuerpo visible del plan.
-  sensitive_body = var.logs_enabled ? {
+  sensitive_body = length(azurerm_log_analytics_workspace.this) > 0 ? {
     properties = {
       appLogsConfiguration = {
         logAnalyticsConfiguration = {
@@ -75,6 +78,16 @@ resource "azapi_resource" "environment" {
   } : null
 
   response_export_values = ["properties.environmentMode"]
+}
+
+locals {
+  environment_id = var.environment_id != null ? var.environment_id : azapi_resource.environment[0].id
+}
+
+# El ambiente paso a tener count: dev conserva el que ya existe en lugar de recrearlo.
+moved {
+  from = azapi_resource.environment
+  to   = azapi_resource.environment[0]
 }
 
 # Identidad asignada por el usuario: existe, y tiene permisos, antes de crear la app.
@@ -101,7 +114,7 @@ resource "time_sleep" "rbac_propagation" {
 resource "azurerm_container_app" "this" {
   name                         = "ca-${var.name}"
   resource_group_name          = var.resource_group_name
-  container_app_environment_id = azapi_resource.environment.id
+  container_app_environment_id = local.environment_id
   revision_mode                = "Single"
   workload_profile_name        = "Consumption"
   tags                         = var.tags
