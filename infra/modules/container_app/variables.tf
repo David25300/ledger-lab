@@ -8,6 +8,11 @@ variable "resource_group_name" {
   type        = string
 }
 
+variable "resource_group_id" {
+  description = "ID del grupo de recursos; azapi lo usa como padre del ambiente."
+  type        = string
+}
+
 variable "location" {
   description = "Region de Azure."
   type        = string

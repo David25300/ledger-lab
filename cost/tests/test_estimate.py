@@ -103,6 +103,37 @@ def test_sql_that_can_bill_is_not_reported_as_free(kwargs):
     assert total(lines) == pytest.approx(10 * 0.5 + 1 * 0.1)
 
 
+def environment(*profile_types):
+    return {
+        "address": "module.stack.module.app.azapi_resource.environment",
+        "mode": "managed",
+        "type": "azapi_resource",
+        "values": {
+            "location": "eastus",
+            "type": "Microsoft.App/managedEnvironments@2026-07-01",
+            "body": {"properties": {
+                "environmentMode": "WorkloadProfiles",
+                "workloadProfiles": [
+                    {"name": t, "workloadProfileType": t} for t in profile_types
+                ],
+            }},
+        },
+    }
+
+
+def test_consumption_only_environment_costs_zero():
+    lines, unknown = cost.estimate({"dev": plan(environment("Consumption"))}, usage(), book())
+    assert total(lines) == 0
+    assert unknown == []
+
+
+def test_dedicated_profile_environment_needs_a_price_rule():
+    _, unknown = cost.estimate(
+        {"dev": plan(environment("Consumption", "D4"))}, usage(), book()
+    )
+    assert unknown == ["dev: module.stack.module.app.azapi_resource.environment"]
+
+
 def test_unknown_resource_is_reported():
     vm = {"address": "azurerm_linux_virtual_machine.x", "mode": "managed",
           "type": "azurerm_linux_virtual_machine", "values": {}}

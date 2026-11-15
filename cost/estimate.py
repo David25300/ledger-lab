@@ -178,6 +178,8 @@ def estimate_plan(name: str, plan: dict, usage: dict, book: PriceBook, grant: di
             lines.append(_container_app(name, address, values, usage, region, book, grant))
         elif kind == "azapi_resource" and "Microsoft.Sql/servers/databases" in values.get("type", ""):
             lines.append(_azapi_database(name, address, values, usage, region, book))
+        elif kind == "azapi_resource" and "Microsoft.App/managedEnvironments" in values.get("type", ""):
+            unknown += _azapi_environment(address, values)
         elif kind == "azurerm_mssql_database":
             lines.append(_paid_database(name, address, usage, region, book))
         elif kind == "azurerm_key_vault":
@@ -224,6 +226,13 @@ def _azapi_database(env, address, values, usage, region, book) -> Line:
     if properties.get("useFreeLimit") and behavior == "AutoPause":
         return Line(env, address, 0.0, "oferta gratuita; se pausa al agotarla")
     return _paid_database(env, address, usage, region, book)
+
+
+def _azapi_environment(address, values) -> list[str]:
+    """Consumption no cobra por el ambiente; un perfil dedicado cobra por hora sin trafico."""
+    profiles = values.get("body", {}).get("properties", {}).get("workloadProfiles") or []
+    dedicated = [p for p in profiles if p.get("workloadProfileType") != "Consumption"]
+    return [address] if dedicated else []
 
 
 def _paid_database(env, address, usage, region, book) -> Line:

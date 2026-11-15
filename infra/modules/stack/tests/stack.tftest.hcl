@@ -7,6 +7,12 @@ mock_provider "azurerm" {
       object_id = "00000000-0000-0000-0000-000000000002"
     }
   }
+  # azapi valida que el padre del ambiente sea un ID de Azure, aun con proveedores simulados.
+  mock_resource "azurerm_resource_group" {
+    defaults = {
+      id = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg"
+    }
+  }
   mock_resource "azurerm_key_vault" {
     defaults = {
       id = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg/providers/Microsoft.KeyVault/vaults/kv"
@@ -29,11 +35,6 @@ mock_provider "azurerm" {
       principal_id = "00000000-0000-0000-0000-000000000003"
     }
   }
-  mock_resource "azurerm_container_app_environment" {
-    defaults = {
-      id = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg/providers/Microsoft.App/managedEnvironments/cae"
-    }
-  }
   mock_resource "azurerm_log_analytics_workspace" {
     defaults = {
       id = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg/providers/Microsoft.OperationalInsights/workspaces/log"
@@ -47,6 +48,14 @@ mock_provider "azurerm" {
 }
 
 mock_provider "azapi" {}
+
+# El ambiente se crea con azapi; azurerm_container_app exige que su ID tenga forma de ID de Azure.
+override_resource {
+  target = module.app.azapi_resource.environment
+  values = {
+    id = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg/providers/Microsoft.App/managedEnvironments/cae"
+  }
+}
 mock_provider "random" {}
 mock_provider "time" {}
 
@@ -78,6 +87,10 @@ run "dev_es_desechable_y_sin_logs" {
   assert {
     condition     = local.is_prod == false
     error_message = "dev no debe activar la configuracion de prod."
+  }
+  assert {
+    condition     = module.app.environment_mode == "WorkloadProfiles"
+    error_message = "Un ambiente express no admite secretos de Key Vault."
   }
 }
 
