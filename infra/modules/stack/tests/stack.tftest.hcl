@@ -149,6 +149,25 @@ run "el_ambiente_de_la_app_puede_ir_en_otra_region" {
   }
 }
 
+run "prod_puede_usar_un_ambiente_compartido" {
+  command = apply
+
+  variables {
+    environment           = "prod"
+    max_replicas          = 3
+    shared_environment_id = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-ledger-dev/providers/Microsoft.App/managedEnvironments/cae-ledger-dev-wp"
+  }
+
+  assert {
+    condition     = module.app.environment_created == false
+    error_message = "Con un ambiente compartido el stack no debe crear otro."
+  }
+  assert {
+    condition     = azurerm_resource_group.this.name == "rg-ledger-prod"
+    error_message = "La app, la base y Key Vault siguen en el grupo propio del ambiente."
+  }
+}
+
 run "la_imagen_debe_ir_por_digest" {
   command = plan
 

@@ -49,19 +49,26 @@ variable "use_free_offer" {
   default = true
 }
 
-# La suscripcion admite un solo ambiente de Container Apps por region y dev ya ocupa location:
-# prod lleva su ambiente y su app a la region de su base, junto a sus datos.
+# Azure for Students admite un solo ambiente de Container Apps por suscripcion, en cualquier region,
+# y dev ya lo creo. Prod pone su app en ese ambiente; app, identidad, base, Key Vault y estado
+# siguen siendo propios de prod. Por eso prod se elimina antes que dev.
+data "azurerm_container_app_environment" "shared" {
+  name                = "cae-ledger-dev-wp"
+  resource_group_name = "rg-ledger-dev"
+}
+
 module "stack" {
   source = "../../modules/stack"
 
   environment       = "prod"
   location          = var.location
   database_location = var.database_location
-  app_location      = var.database_location
   image             = var.image
   use_free_offer    = var.use_free_offer
   max_replicas      = 3
   jwt_minutes       = 15
+
+  shared_environment_id = data.azurerm_container_app_environment.shared.id
 }
 
 output "app_url" {
