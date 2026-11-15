@@ -37,7 +37,7 @@ resource "azapi_resource" "environment" {
   type      = "Microsoft.App/managedEnvironments@2026-07-01"
   name      = "cae-${var.name}-wp"
   parent_id = var.resource_group_id
-  location  = var.location
+  location  = coalesce(var.environment_location, var.location)
   tags      = var.tags
 
   # La version de azapi aun no trae el esquema de 2026-07-01; Azure valida el cuerpo igual.

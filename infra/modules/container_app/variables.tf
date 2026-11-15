@@ -18,6 +18,12 @@ variable "location" {
   type        = string
 }
 
+variable "environment_location" {
+  description = "Region del ambiente y de la app. Con null usa location; la identidad y los logs se quedan en location."
+  type        = string
+  default     = null
+}
+
 variable "image" {
   description = "Imagen del contenedor."
   type        = string
