@@ -5,6 +5,10 @@ terraform {
       source  = "hashicorp/azurerm"
       version = "~> 5.0"
     }
+    azapi = {
+      source  = "Azure/azapi"
+      version = "~> 2.0"
+    }
     time = {
       source  = "hashicorp/time"
       version = "~> 0.12"
@@ -24,19 +28,53 @@ resource "azurerm_log_analytics_workspace" "this" {
   tags                = var.tags
 }
 
-resource "azurerm_container_app_environment" "this" {
-  name                       = "cae-${var.name}"
-  resource_group_name        = var.resource_group_name
-  location                   = var.location
-  logs_destination           = var.logs_enabled ? "log-analytics" : null
-  log_analytics_workspace_id = var.logs_enabled ? azurerm_log_analytics_workspace.this[0].id : null
-  tags                       = var.tags
+# Desde que Container Apps express es GA, Azure crea como "Express" un ambiente de solo consumo,
+# sin logs ni VNet, y en express la app no puede leer secretos de Key Vault
+# (ExpressKeyVaultSecretsNotSupported). azurerm no expone environmentMode, por eso el ambiente se
+# crea con azapi y fija el modo de perfiles de carga de trabajo. El perfil Consumption no tiene
+# cargo fijo. El sufijo -wp evita chocar con el nombre del ambiente express que reemplaza.
+resource "azapi_resource" "environment" {
+  type      = "Microsoft.App/managedEnvironments@2026-07-01"
+  name      = "cae-${var.name}-wp"
+  parent_id = var.resource_group_id
+  location  = var.location
+  tags      = var.tags
 
-  # Azure lo agrega siempre; declararlo evita un cambio perpetuo en cada plan. No tiene cargo fijo.
-  workload_profile {
-    name                  = "Consumption"
-    workload_profile_type = "Consumption"
+  # La version de azapi aun no trae el esquema de 2026-07-01; Azure valida el cuerpo igual.
+  schema_validation_enabled = false
+  ignore_null_property      = true
+
+  body = {
+    properties = {
+      environmentMode = "WorkloadProfiles"
+      workloadProfiles = [
+        {
+          name                = "Consumption"
+          workloadProfileType = "Consumption"
+        }
+      ]
+      # Solo prod envia logs a Log Analytics; en dev el ambiente queda sin destino de logs.
+      appLogsConfiguration = var.logs_enabled ? {
+        destination = "log-analytics"
+        logAnalyticsConfiguration = {
+          customerId = azurerm_log_analytics_workspace.this[0].workspace_id
+        }
+      } : null
+    }
   }
+
+  # La clave del workspace no se guarda en el cuerpo visible del plan.
+  sensitive_body = var.logs_enabled ? {
+    properties = {
+      appLogsConfiguration = {
+        logAnalyticsConfiguration = {
+          sharedKey = azurerm_log_analytics_workspace.this[0].primary_shared_key
+        }
+      }
+    }
+  } : null
+
+  response_export_values = ["properties.environmentMode"]
 }
 
 # Identidad asignada por el usuario: existe, y tiene permisos, antes de crear la app.
@@ -63,7 +101,7 @@ resource "time_sleep" "rbac_propagation" {
 resource "azurerm_container_app" "this" {
   name                         = "ca-${var.name}"
   resource_group_name          = var.resource_group_name
-  container_app_environment_id = azurerm_container_app_environment.this.id
+  container_app_environment_id = azapi_resource.environment.id
   revision_mode                = "Single"
   workload_profile_name        = "Consumption"
   tags                         = var.tags
