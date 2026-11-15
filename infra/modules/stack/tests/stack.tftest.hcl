@@ -130,6 +130,25 @@ run "la_base_puede_ir_en_otra_region" {
   }
 }
 
+run "el_ambiente_de_la_app_puede_ir_en_otra_region" {
+  command = apply
+
+  variables {
+    environment  = "prod"
+    max_replicas = 3
+    app_location = "canadacentral"
+  }
+
+  assert {
+    condition     = azurerm_resource_group.this.location == "eastus"
+    error_message = "El grupo de recursos sigue en la region del ambiente."
+  }
+  assert {
+    condition     = module.app.environment_location == "canadacentral"
+    error_message = "El ambiente de Container Apps debe crearse en app_location."
+  }
+}
+
 run "la_imagen_debe_ir_por_digest" {
   command = plan
 

@@ -49,12 +49,15 @@ variable "use_free_offer" {
   default = true
 }
 
+# La suscripcion admite un solo ambiente de Container Apps por region y dev ya ocupa location:
+# prod lleva su ambiente y su app a la region de su base, junto a sus datos.
 module "stack" {
   source = "../../modules/stack"
 
   environment       = "prod"
   location          = var.location
   database_location = var.database_location
+  app_location      = var.database_location
   image             = var.image
   use_free_offer    = var.use_free_offer
   max_replicas      = 3

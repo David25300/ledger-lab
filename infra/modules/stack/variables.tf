@@ -19,6 +19,12 @@ variable "database_location" {
   default     = null
 }
 
+variable "app_location" {
+  description = "Region del ambiente de Container Apps, si debe ser otra: la suscripcion admite pocos ambientes por region. Con null usa location."
+  type        = string
+  default     = null
+}
+
 variable "image" {
   description = "Imagen fijada por digest, para que prod ejecute exactamente lo probado en dev."
   type        = string

@@ -82,6 +82,7 @@ module "app" {
   resource_group_name   = azurerm_resource_group.this.name
   resource_group_id     = azurerm_resource_group.this.id
   location              = azurerm_resource_group.this.location
+  environment_location  = var.app_location
   image                 = var.image
   key_vault_id          = module.key_vault.id
   secret_ids            = module.key_vault.secret_ids
